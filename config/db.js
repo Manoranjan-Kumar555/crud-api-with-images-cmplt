@@ -6,7 +6,7 @@ dotenv.config();
 export const connectDB = async () => {
   try {
     const connection = await mongoose.connect(
-      process.env.MONGO_DATABASE_URL_LOCAL,
+      process.env.MONGO_DATABASE_URL,
       {
         dbName: "students-crud", // Replace with your DB name if needed
       }
