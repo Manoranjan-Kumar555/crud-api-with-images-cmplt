@@ -35,30 +35,46 @@ const upload = multer({
   },
 });
 
-// ✅ Get All Students (Production-Ready)
+// ✅ Get All Students (with Search + Pagination)
 router.get("/", async (req, res) => {
   try {
-    const students = await Students.find();
+    const search = req.query.search || "";
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 5;
+    const skip = (page - 1) * limit;
 
-    // ⚠️ If no records found
-    if (!students || students.length === 0) {
+    const query = {
+      $or: [
+        { first_name: { $regex: search, $options: "i" } },
+        { last_name: { $regex: search, $options: "i" } },
+        { email: { $regex: search, $options: "i" } },
+      ],
+    };
+
+    const total = await Students.countDocuments(query); // ✅ Apply search here
+    const students = await Students.find(query)
+      .skip(skip)
+      .limit(limit)
+      .sort({ createdAt: -1 });
+
+    if (!students.length) {
       return res.status(404).json({
         success: false,
-        message: "No students found in the database.",
+        message: "No students found.",
         data: [],
+        total: 0,
       });
     }
 
-    // ✅ Successful response
     return res.status(200).json({
       success: true,
-      count: students.length,
       message: "Students fetched successfully.",
+      count: students.length,
+      total, // ✅ total count for frontend pagination
       data: students,
     });
   } catch (error) {
     console.error("❌ Error fetching students:", error.message);
-
     return res.status(500).json({
       success: false,
       message: "Internal Server Error while fetching students.",
@@ -66,6 +82,8 @@ router.get("/", async (req, res) => {
     });
   }
 });
+
+
 
 // ✅ Get Single Student by ID
 router.get("/:id", async (req, res) => {

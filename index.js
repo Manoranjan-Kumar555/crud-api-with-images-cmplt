@@ -4,10 +4,21 @@ import { MulterError } from "multer";
 import path from "path";
 import { connectDB } from "./config/db.js";
 import studentRoutes from "./routes/student.routes.js";
+import cors from "cors";
+import { fileURLToPath } from "url";
+import auth from "./middleware/auth.js";
+import userRoutes from "./routes/user.routes.js";
+
 
 dotenv.config();
+
 const app = express();
+
 const PORT = process.env.PORT || 8081;
+
+// ✅ Fix __dirname for ES Modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // ✅ Connect MongoDB
 connectDB();
@@ -15,6 +26,10 @@ connectDB();
 // ✅ Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(cors()); // allow frontend connection (React)
+
+// ✅ Static folder for uploaded images
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // ✅ EJS Setup
 app.set("view engine", "ejs");
@@ -49,6 +64,8 @@ app.get("/", (req, res) => {
 });
 
 // ✅ Student Routes
+app.use("/api/users", userRoutes);
+app.use(auth);
 app.use("/api/students", studentRoutes);
 
 // ✅ Global Error Handling Middleware
@@ -67,22 +84,28 @@ app.use((error, req, res, next) => {
 
     return res.status(400).json({
       success: false,
+      type: "upload_error",
       message,
-      error: error.message,
+      details: error.message,
     });
   }
 
-  // ✅ Handle custom or general errors
-  if (error) {
-    return res.status(500).json({
+  // ✅ Handle Validation / Custom Errors
+  if (error.name === "ValidationError") {
+    return res.status(400).json({
       success: false,
-      message: "Internal Server Error.",
-      error: error.message || "Unknown error occurred.",
+      type: "validation_error",
+      message: error.message,
     });
   }
 
-  // ✅ Pass to next middleware if no error
-  next();
+  // ✅ Fallback for Other Errors
+  return res.status(500).json({
+    success: false,
+    type: "server_error",
+    message: "Something went wrong on the server.",
+    details: error.message || "Unknown error occurred.",
+  });
 });
 
 // ✅ Catch-All 404 Route
